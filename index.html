@@ -1,341 +1,152 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Effects</title>
-<style>
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #111; }
-  canvas { display: block; }
-  .back {
-    position: fixed; top: 24px; left: 32px; z-index: 20;
-    font-family: -apple-system, sans-serif; font-size: 11px;
-    font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
-    color: rgba(255,255,255,0.3); text-decoration: none; transition: color .2s;
-  }
-  .back:hover { color: rgba(255,255,255,0.65); }
-</style>
-</head>
-<body>
-<canvas id="c"></canvas>
-<a class="back" href="../">← Back</a>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Particles</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #f8f8f8; }
+    canvas { display: block; width: 100vw; height: 100vh; }
 
-<script>
-const canvas = document.getElementById('c');
-const ctx    = canvas.getContext('2d');
-let W, H, S;
-
-// ── Mouse ─────────────────────────────────────────────────────────────────
-let mx = -9999, my = -9999, mActive = false;
-window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; mActive = true; });
-window.addEventListener('mouseleave', () => { mActive = false; });
-window.addEventListener('touchmove', e => {
-  e.preventDefault();
-  mx = e.touches[0].clientX; my = e.touches[0].clientY; mActive = true;
-}, { passive: false });
-window.addEventListener('touchend', () => { mActive = false; });
-
-// ════════════════════════════════════════════════════════════════════════════
-// SECTION 1 — Underwater: dark bg, particles attracted to mouse with heavy lag
-//             Particles swarm and trail behind cursor like ink in water
-// ════════════════════════════════════════════════════════════════════════════
-const S1_N   = 14000;
-const s1x    = new Float32Array(S1_N);
-const s1y    = new Float32Array(S1_N);
-const s1vx   = new Float32Array(S1_N);
-const s1vy   = new Float32Array(S1_N);
-const s1hx   = new Float32Array(S1_N);  // home x — keeps field always full
-const s1hy   = new Float32Array(S1_N);  // home y
-
-const S1_ATTR_R  = 130;               // attraction radius
-const S1_ATTR_R2 = S1_ATTR_R * S1_ATTR_R;
-const S1_F    = 4.5;   // attraction force toward mouse
-const S1_SP   = 0.012; // weak spring — slow return = underwater feel
-const S1_DAMP = 0.94;  // high damping = thick resistance
-
-function s1Init() {
-  for (let i = 0; i < S1_N; i++) {
-    s1x[i]  = s1hx[i] = Math.random() * S;
-    s1y[i]  = s1hy[i] = Math.random() * H;
-    s1vx[i] = 0; s1vy[i] = 0;
-  }
-}
-
-function s1Update() {
-  const inS1 = mActive && mx < S;
-  for (let i = 0; i < S1_N; i++) {
-    // Attract toward mouse (opposite of section 3 repulsion)
-    if (inS1) {
-      const dx = mx - s1x[i];
-      const dy = my - s1y[i];
-      const d2 = dx*dx + dy*dy;
-      if (d2 < S1_ATTR_R2 && d2 > 0.5) {
-        const d = Math.sqrt(d2);
-        const t = 1 - d / S1_ATTR_R;
-        s1vx[i] += dx / d * t * t * S1_F;
-        s1vy[i] += dy / d * t * t * S1_F;
-      }
+    .center {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
     }
 
-    // Slow spring back to home — field stays spread
-    s1vx[i] += (s1hx[i] - s1x[i]) * S1_SP;
-    s1vy[i] += (s1hy[i] - s1y[i]) * S1_SP;
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300&display=swap');
 
-    // Heavy damping = underwater resistance
-    s1vx[i] *= S1_DAMP; s1vy[i] *= S1_DAMP;
+    .btn-click {
+      pointer-events: all;
+      font-family: 'Manrope', -apple-system, sans-serif;
+      font-size: 18px;
+      font-weight: 200;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      color: #1a1a1a;
+      text-decoration: none;
+      padding: 20px 60px;
+      border: 1px solid rgba(0,0,0,0.18);
+      border-radius: 100px;
+      background: rgba(255,255,255,0.22);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: background 0.25s, transform 0.2s, letter-spacing 0.25s;
+    }
 
-    s1x[i] += s1vx[i]; s1y[i] += s1vy[i];
+    .btn-click:hover {
+      background: rgba(255,255,255,0.42);
+      transform: scale(1.05);
+      letter-spacing: 12px;
+    }
+  </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="center">
+  <a href="effects/" class="btn-click">Click</a>
+</div>
+<script>
+  const canvas = document.getElementById("canvas");
+  const ctx    = canvas.getContext("2d");
+
+  let W = canvas.width  = window.innerWidth;
+  let H = canvas.height = window.innerHeight;
+
+  const N   = 30000;
+  const px  = new Float32Array(N);   // текущая x
+  const py  = new Float32Array(N);   // текущая y
+  const pvx = new Float32Array(N);   // скорость x
+  const pvy = new Float32Array(N);   // скорость y
+  const phx = new Float32Array(N);   // домашняя x (куда вернуться)
+  const phy = new Float32Array(N);   // домашняя y
+
+  // Мышь
+  let mx = -9999, my = -9999, mActive = false;
+
+  window.addEventListener("mousemove", e => { mx = e.clientX; my = e.clientY; mActive = true; });
+  window.addEventListener("mouseleave", () => { mActive = false; });
+  window.addEventListener("touchmove", e => {
+    e.preventDefault();
+    mx = e.touches[0].clientX; my = e.touches[0].clientY; mActive = true;
+  }, { passive: false });
+  window.addEventListener("touchend", () => { mActive = false; });
+  window.addEventListener("resize", () => {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    init();
+  });
+
+  function init() {
+    for (let i = 0; i < N; i++) {
+      phx[i] = Math.random() * W;
+      phy[i] = Math.random() * H;
+      px[i]  = phx[i];
+      py[i]  = phy[i];
+      pvx[i] = 0;
+      pvy[i] = 0;
+    }
   }
-}
 
-function s1Draw() {
-  ctx.fillStyle = '#0a0c12';
-  ctx.fillRect(0, 0, S, H);
+  // ── Физика ──────────────────────────────────────────────────────────────────
+  const REPEL_R  = 90;
+  const REPEL_R2 = REPEL_R * REPEL_R;
+  const REPEL_F  = 5;     // сила отталкивания — не слишком сильная
+  const SPRING   = 0.018; // слабая пружина — нет перелёта
+  const DAMP     = 0.96;  // высокое затухание — нет осцилляции
+  const MAX_V    = 10;    // ограничение скорости
 
-  // Single fill pass — fixed 2×2 dots, never shrink
-  ctx.fillStyle = 'rgba(200,215,255,0.72)';
-  for (let i = 0; i < S1_N; i++) {
-    ctx.fillRect(s1x[i] | 0, s1y[i] | 0, 2, 2);
-  }
-}
+  function animate() {
+    requestAnimationFrame(animate);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(20,20,20,0.85)";
 
-// ════════════════════════════════════════════════════════════════════════════
-// SECTION 2 — Texture on light bg: grid of dots displaced by mouse,
-//             shows path through distortion like sand or fine fabric
-// ════════════════════════════════════════════════════════════════════════════
-const S2_CELL = 9;   // grid spacing px
-let s2Cols, s2Rows;
-let s2dx, s2dy;      // displacement per cell
-
-const S2_INF_R  = 70;
-const S2_INF_R2 = S2_INF_R * S2_INF_R;
-const S2_PUSH   = 5.5;
-const S2_DECAY  = 0.94;  // how fast displacement fades
-
-function s2Init() {
-  s2Cols = Math.floor(S / S2_CELL) + 1;
-  s2Rows = Math.floor(H / S2_CELL) + 1;
-  s2dx   = new Float32Array(s2Cols * s2Rows);
-  s2dy   = new Float32Array(s2Cols * s2Rows);
-}
-
-function s2Update() {
-  const inS2 = mActive && mx >= S && mx < 2 * S;
-
-  for (let r = 0; r < s2Rows; r++) {
-    for (let c = 0; c < s2Cols; c++) {
-      const idx = r * s2Cols + c;
-      const gx  = S + c * S2_CELL;
-      const gy  = r * S2_CELL;
-
-      if (inS2) {
-        const dx = gx - mx, dy = gy - my;
-        const d2 = dx*dx + dy*dy;
-        if (d2 < S2_INF_R2 && d2 > 0.5) {
-          const d = Math.sqrt(d2);
-          const t = (1 - d / S2_INF_R) * (1 - d / S2_INF_R);
-          s2dx[idx] += dx / d * t * S2_PUSH;
-          s2dy[idx] += dy / d * t * S2_PUSH;
+    for (let i = 0; i < N; i++) {
+      // 1. Мышка отталкивает
+      if (mActive) {
+        const dx = px[i] - mx;
+        const dy = py[i] - my;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < REPEL_R2 && d2 > 0.5) {
+          const d  = Math.sqrt(d2);
+          const t  = 1 - d / REPEL_R;     // 0..1 — сильнее у центра
+          const f  = t * t * REPEL_F;
+          pvx[i] += (dx / d) * f;         // вектор ОТ мышки
+          pvy[i] += (dy / d) * f;
         }
       }
 
-      // Decay back to grid position
-      s2dx[idx] *= S2_DECAY;
-      s2dy[idx] *= S2_DECAY;
-    }
-  }
-}
+      // 2. Пружина тянет домой — слабо, без перелёта
+      pvx[i] += (phx[i] - px[i]) * SPRING;
+      pvy[i] += (phy[i] - py[i]) * SPRING;
 
-function s2Draw() {
-  // Background
-  ctx.fillStyle = '#f4f2ee';
-  ctx.fillRect(S, 0, S, H);
+      // 3. Затухание — гасит скорость, нет осцилляции
+      pvx[i] *= DAMP;
+      pvy[i] *= DAMP;
 
-  // Displaced grid dots
-  for (let r = 0; r < s2Rows; r++) {
-    for (let c = 0; c < s2Cols; c++) {
-      const idx = r * s2Cols + c;
-      const ddx = s2dx[idx], ddy = s2dy[idx];
-      const dist = Math.sqrt(ddx*ddx + ddy*ddy);
-      const alpha = 0.18 + Math.min(dist / S2_PUSH, 1) * 0.55;
-      const shade = Math.floor(140 - Math.min(dist / S2_PUSH, 1) * 90);
-
-      ctx.fillStyle = `rgba(${shade},${shade},${shade},${alpha})`;
-      const px = S + c * S2_CELL + ddx;
-      const py = r * S2_CELL + ddy;
-      ctx.beginPath();
-      ctx.arc(px, py, 1.2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// SECTION 3 — Wood shavings: 3000 curved arcs, smooth mouse, dark bg
-// ════════════════════════════════════════════════════════════════════════════
-const S3_N  = 3000;
-
-const s3x    = new Float32Array(S3_N);
-const s3y    = new Float32Array(S3_N);
-const s3vx   = new Float32Array(S3_N);
-const s3vy   = new Float32Array(S3_N);
-const s3hx   = new Float32Array(S3_N);
-const s3hy   = new Float32Array(S3_N);
-const s3ang  = new Float32Array(S3_N);
-const s3van  = new Float32Array(S3_N);
-const s3han  = new Float32Array(S3_N);
-const s3arc  = new Float32Array(S3_N);
-const s3rad  = new Float32Array(S3_N);
-const s3wid  = new Float32Array(S3_N);
-const s3col  = [];   // pre-computed color strings — no per-frame string alloc
-
-// Smoothed mouse for section 3 — floats slowly, never jerky
-let s3smx = -9999, s3smy = -9999;
-
-const S3_R   = 110, S3_R2 = S3_R * S3_R;
-const S3_F   = 11;
-const S3_SP  = 0.022;
-const S3_D   = 0.878;
-const S3_AD  = 0.875;
-const S3_LAG = 0.065; // mouse smoothing 0=frozen 1=instant
-
-function s3Init() {
-  s3col.length = 0;
-  s3smx = 2*S + S/2; s3smy = H/2;
-  for (let i = 0; i < S3_N; i++) {
-    s3x[i]  = s3hx[i] = 2*S + Math.random() * S;
-    s3y[i]  = s3hy[i] = Math.random() * H;
-    s3vx[i] = 0; s3vy[i] = 0;
-    s3ang[i]= s3han[i]= Math.random() * Math.PI * 2;
-    s3van[i]= 0;
-    s3arc[i]= 0.6 + Math.random() * 1.5;
-    s3rad[i]= 6   + Math.random() * 24;
-    s3wid[i]= 0.7 + Math.random() * 1.9;
-    // Metal palette: dark steel → chrome → blue-steel → glint
-    const palette = [
-      [210, 12, 30],   // dark steel
-      [215, 18, 48],   // mid steel
-      [205, 22, 62],   // blue steel
-      [200, 10, 75],   // silver
-      [210,  8, 88],   // chrome glint
-      [220, 20, 40],   // gunmetal
-    ];
-    const [h, s, l] = palette[Math.floor(Math.random() * palette.length)];
-    const jh = h + (Math.random() - 0.5) * 10;
-    const jl = l + (Math.random() - 0.5) * 12;
-    const a  = (0.35 + Math.random() * 0.55).toFixed(2);
-    s3col.push(`hsla(${Math.floor(jh)},${s}%,${Math.floor(jl)}%,${a})`);
-  }
-}
-
-function s3Update() {
-  // Smooth mouse position — soft, unhurried movement
-  if (mActive && mx >= 2*S) {
-    s3smx += (mx - s3smx) * S3_LAG;
-    s3smy += (my - s3smy) * S3_LAG;
-  }
-
-  const inS3 = mActive && mx >= 2*S;
-  for (let i = 0; i < S3_N; i++) {
-    if (inS3) {
-      const dx = s3x[i] - s3smx, dy = s3y[i] - s3smy;
-      const d2 = dx*dx + dy*dy;
-      if (d2 < S3_R2 && d2 > 0.5) {
-        const d  = Math.sqrt(d2);
-        const t  = 1 - d / S3_R;
-        s3vx[i] += dx/d * t*t * S3_F;
-        s3vy[i] += dy/d * t*t * S3_F;
-        s3van[i]+= (Math.random() - 0.5) * t * 0.5;
+      // 4. Ограничение скорости — частицы не улетают
+      const spd = pvx[i] * pvx[i] + pvy[i] * pvy[i];
+      if (spd > MAX_V * MAX_V) {
+        const s  = MAX_V / Math.sqrt(spd);
+        pvx[i] *= s;
+        pvy[i] *= s;
       }
+
+      // 5. Позиция
+      px[i] += pvx[i];
+      py[i] += pvy[i];
+
+      // 6. Рисуем точку
+      ctx.fillRect(px[i] | 0, py[i] | 0, 1, 1);
     }
-    // no spring — shavings stay where they land
-    s3vx[i] *= S3_D; s3vy[i] *= S3_D;
-    s3x[i]  += s3vx[i]; s3y[i]  += s3vy[i];
-    s3van[i] *= S3_AD; // rotation also just slows down
-    s3van[i]*= S3_AD;
-    s3ang[i]+= s3van[i];
-  }
-}
-
-function s3Draw() {
-  ctx.fillStyle = '#12141a';
-  ctx.fillRect(2*S, 0, S, H);
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(2*S, 0, S, H);
-  ctx.clip();
-  ctx.lineCap = 'round';
-
-  for (let i = 0; i < S3_N; i++) {
-    const spd  = Math.hypot(s3vx[i], s3vy[i]);
-    const fly  = Math.min(spd / 9, 1);
-    const ca   = Math.cos(s3ang[i]);
-    const sa   = Math.sin(s3ang[i]);
-
-    // setTransform: no save/restore — much faster
-    ctx.setTransform(ca, sa, -sa, ca, s3x[i], s3y[i]);
-
-    ctx.beginPath();
-    ctx.arc(0, s3rad[i], s3rad[i],
-            -Math.PI/2 - s3arc[i]/2,
-            -Math.PI/2 + s3arc[i]/2);
-    ctx.strokeStyle = s3col[i];               // pre-computed — no alloc
-    ctx.lineWidth   = s3wid[i] * (1 + fly * 0.7);
-    ctx.stroke();
   }
 
-  // Reset transform
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.restore();
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// DIVIDERS + LABELS
-// ════════════════════════════════════════════════════════════════════════════
-function drawUI() {
-  ctx.strokeStyle = 'rgba(120,120,120,0.2)';
-  ctx.lineWidth   = 1;
-  ctx.setLineDash([4, 8]);
-  ctx.beginPath(); ctx.moveTo(S,   0); ctx.lineTo(S,   H); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(2*S, 0); ctx.lineTo(2*S, H); ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.font = '600 10px -apple-system,sans-serif';
-
-  ctx.fillStyle = 'rgba(180,200,255,0.35)';
-  ctx.fillText('UNDERWATER', S/2, 24);
-
-  ctx.fillStyle = 'rgba(80,80,80,0.3)';
-  ctx.fillText('TEXTURE', S + S/2, 24);
-
-  ctx.fillStyle = 'rgba(160,180,210,0.35)';
-  ctx.fillText('METAL', 2*S + S/2, 24);
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// INIT + LOOP
-// ════════════════════════════════════════════════════════════════════════════
-function init() {
-  W = canvas.width  = window.innerWidth;
-  H = canvas.height = window.innerHeight;
-  S = W / 3;
-  s1Init();
-  s2Init();
-  s3Init();
-}
-
-function loop() {
-  requestAnimationFrame(loop);
-  s1Update(); s2Update(); s3Update();
-  s1Draw();   s2Draw();   s3Draw();
-  drawUI();
-}
-
-window.addEventListener('resize', init);
-init();
-loop();
+  init();
+  animate();
 </script>
 </body>
 </html>
